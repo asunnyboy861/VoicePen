@@ -7,8 +7,10 @@ struct RecordingListView: View {
     private var recordings: [Recording]
 
     @State private var searchText = ""
-    @State private var showRecording = false
     @State private var selectedRecording: Recording?
+    @Binding var navigationRecording: Recording?
+    @State private var recordingToDelete: Recording?
+    @State private var showDeleteConfirmation = false
 
     var filteredRecordings: [Recording] {
         if searchText.isEmpty {
@@ -56,7 +58,9 @@ struct RecordingListView: View {
                 ForEach(groupedRecordings, id: \.0) { groupName, items in
                     Section(groupName) {
                         ForEach(items) { recording in
-                            NavigationLink(destination: TranscriptionDetailView(recording: recording)) {
+                            Button(action: {
+                                selectedRecording = recording
+                            }) {
                                 RecordingRowView(recording: recording)
                             }
                             .swipeActions(edge: .leading) {
@@ -67,7 +71,8 @@ struct RecordingListView: View {
                             }
                             .swipeActions(edge: .trailing) {
                                 Button(role: .destructive) {
-                                    deleteRecording(recording)
+                                    recordingToDelete = recording
+                                    showDeleteConfirmation = true
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -93,6 +98,23 @@ struct RecordingListView: View {
                         description: Text("Tap the record button to create your first transcription.")
                     )
                 }
+            }
+            .onChange(of: navigationRecording) { _, newValue in
+                if let recording = newValue {
+                    selectedRecording = recording
+                    navigationRecording = nil
+                }
+            }
+            .navigationDestination(item: $selectedRecording) { recording in
+                TranscriptionDetailView(recording: recording)
+            }
+            .alert("Delete Recording?", isPresented: $showDeleteConfirmation, presenting: recordingToDelete) { recording in
+                Button("Delete", role: .destructive) {
+                    deleteRecording(recording)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { recording in
+                Text("This will permanently delete \"\(recording.displayTitle)\" and its audio file.")
             }
         }
     }
@@ -155,6 +177,6 @@ struct RecordingRowView: View {
 }
 
 #Preview {
-    RecordingListView()
+    RecordingListView(navigationRecording: .constant(nil))
         .modelContainer(for: [Recording.self, TranscriptSegment.self])
 }

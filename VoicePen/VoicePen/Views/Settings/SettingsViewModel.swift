@@ -4,15 +4,41 @@ import SwiftData
 @Observable
 final class SettingsViewModel {
     var selectedModel: String {
-        didSet { UserDefaults.standard.set(selectedModel, forKey: "selectedModel") }
+        didSet {
+            UserDefaults.standard.set(selectedModel, forKey: "selectedModel")
+            if selectedModel != oldValue && !isRollingBack {
+                reloadModel()
+            }
+        }
+    }
+
+    var isReloadingModel = false
+    private var isRollingBack = false
+
+    private func reloadModel() {
+        isReloadingModel = true
+        let previousModel = selectedModel
+        Task {
+            do {
+                let engine = TranscriptionEngine.shared
+                try await engine.loadModel(selectedModel)
+                await MainActor.run {
+                    self.isReloadingModel = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.isRollingBack = true
+                    self.selectedModel = previousModel
+                    UserDefaults.standard.set(previousModel, forKey: "selectedModel")
+                    self.isRollingBack = false
+                    self.isReloadingModel = false
+                }
+            }
+        }
     }
 
     var vadAutoStop: Bool {
         didSet { UserDefaults.standard.set(vadAutoStop, forKey: "vadAutoStop") }
-    }
-
-    var iCloudSyncEnabled: Bool {
-        didSet { UserDefaults.standard.set(iCloudSyncEnabled, forKey: "iCloudSyncEnabled") }
     }
 
     var recordingsStorage: String = "Calculating..."
@@ -23,7 +49,6 @@ final class SettingsViewModel {
     init() {
         self.selectedModel = UserDefaults.standard.string(forKey: "selectedModel") ?? "openai_whisper-large-v3-turbo"
         self.vadAutoStop = UserDefaults.standard.bool(forKey: "vadAutoStop")
-        self.iCloudSyncEnabled = UserDefaults.standard.bool(forKey: "iCloudSyncEnabled")
         updateStorageInfo()
     }
 

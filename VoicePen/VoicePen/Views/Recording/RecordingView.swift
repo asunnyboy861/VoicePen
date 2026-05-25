@@ -4,6 +4,10 @@ import SwiftData
 struct RecordingView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = RecordingViewModel()
+    @State private var usageTracker = UsageTracker.shared
+    @State private var purchaseManager = PurchaseManager.shared
+    @Binding var selectedTab: Int
+    @Binding var navigationRecording: Recording?
 
     var body: some View {
         VStack(spacing: 24) {
@@ -31,6 +35,17 @@ struct RecordingView: View {
         .onAppear {
             viewModel.setModelContext(modelContext)
         }
+        .onChange(of: viewModel.completedRecording) { _, newValue in
+            if let recording = newValue {
+                navigationRecording = recording
+                viewModel.completedRecording = nil
+            }
+        }
+        .sheet(isPresented: $viewModel.showPaywall) {
+            NavigationStack {
+                PaywallView()
+            }
+        }
     }
 
     private var idleRecordingView: some View {
@@ -38,6 +53,14 @@ struct RecordingView: View {
             Image(systemName: "waveform.circle")
                 .font(.system(size: 80))
                 .foregroundStyle(Color.accentColor)
+
+            if purchaseManager.isPro {
+                Label("Pro — Unlimited", systemImage: "crown.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.yellow)
+            } else {
+                usageIndicator
+            }
 
             Text("Tap to Record")
                 .font(.title2)
@@ -49,6 +72,21 @@ struct RecordingView: View {
                     .foregroundStyle(.red)
             }
             .accessibilityLabel("Start Recording")
+        }
+    }
+
+    private var usageIndicator: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 4) {
+                ForEach(0..<usageTracker.freeLimit, id: \.self) { index in
+                    Image(systemName: index < usageTracker.usageCountThisMonth ? "mic.fill" : "mic")
+                        .font(.caption2)
+                        .foregroundStyle(index < usageTracker.usageCountThisMonth ? Color.accentColor : .secondary)
+                }
+            }
+            Text("\(usageTracker.remainingFreeUses) of \(usageTracker.freeLimit) free this month")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
     }
 
@@ -103,18 +141,26 @@ struct RecordingView: View {
                 .progressViewStyle(.circular)
                 .scaleEffect(1.5)
 
-            Text("Transcribing...")
-                .font(.headline)
-                .foregroundStyle(.secondary)
+            if let error = viewModel.errorMessage, error.contains("Downloading") || error.contains("download failed") {
+                Text(error)
+                    .font(.subheadline)
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            } else {
+                Text("Transcribing...")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
 
-            Text("Your audio is being processed on-device")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+                Text("Your audio is being processed on-device")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
         }
     }
 }
 
 #Preview {
-    RecordingView()
+    RecordingView(selectedTab: .constant(1), navigationRecording: .constant(nil))
         .modelContainer(for: [Recording.self, TranscriptSegment.self])
 }

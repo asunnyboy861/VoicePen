@@ -25,7 +25,7 @@ enum ExportFormat: String, CaseIterable {
 
 struct ExportService {
     static func export(recording: Recording, format: ExportFormat) -> Data? {
-        let sortedSegments = recording.segments.sorted { $0.startTime < $1.startTime }
+        let sortedSegments = (recording.segments ?? []).sorted { $0.startTime < $1.startTime }
 
         switch format {
         case .txt:

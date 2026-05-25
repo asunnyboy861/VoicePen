@@ -26,8 +26,8 @@ final class TranscriptionEngine {
         whisperKit = try await WhisperKit(
             model: model,
             computeOptions: ModelComputeOptions(
-                audioEncoderCompute: .cpuOnly,
-                textDecoderCompute: .cpuOnly
+                audioEncoderCompute: .cpuAndNeuralEngine,
+                textDecoderCompute: .cpuAndNeuralEngine
             ),
             verbose: true,
             prewarm: false,

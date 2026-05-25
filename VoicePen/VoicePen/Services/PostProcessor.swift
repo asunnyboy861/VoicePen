@@ -75,22 +75,28 @@ struct PostProcessor {
     }
 
     static func sentenceSegmentation(_ text: String) -> String {
-        var result = text
-        result = result.replacingOccurrences(of: ". ", with: ".\n")
-        result = result.replacingOccurrences(of: "? ", with: "?\n")
-        result = result.replacingOccurrences(of: "! ", with: "!\n")
-        return result
+        return text
     }
 
     static func capitalizeFirstLetters(_ text: String) -> String {
-        var lines = text.components(separatedBy: "\n")
-        for i in 0..<lines.count {
-            if let firstChar = lines[i].first {
-                if firstChar.isLetter {
-                    lines[i] = String(firstChar.uppercased()) + lines[i].dropFirst()
-                }
+        var result = text
+        if let firstChar = result.first, firstChar.isLetter {
+            result = String(firstChar.uppercased()) + result.dropFirst()
+        }
+        let sentenceEnders = [". ", "? ", "! "]
+        for ender in sentenceEnders {
+            let parts = result.components(separatedBy: ender)
+            if parts.count > 1 {
+                result = parts.enumerated().map { index, part in
+                    if index == 0 { return part }
+                    var trimmed = part
+                    if let first = trimmed.first, first.isLetter {
+                        trimmed = String(first.uppercased()) + trimmed.dropFirst()
+                    }
+                    return trimmed
+                }.joined(separator: ender)
             }
         }
-        return lines.joined(separator: "\n")
+        return result
     }
 }

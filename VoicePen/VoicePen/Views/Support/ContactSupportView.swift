@@ -1,5 +1,19 @@
 import SwiftUI
 
+struct FeedbackRequest: Codable {
+    let name: String
+    let email: String
+    let subject: String
+    let message: String
+    let app_name: String
+}
+
+struct FeedbackResponse: Codable {
+    let success: Bool
+    let id: Int?
+    let error: String?
+}
+
 struct ContactSupportView: View {
     @State private var selectedSubject: SupportSubject = .general
     @State private var customSubject = ""
@@ -7,14 +21,28 @@ struct ContactSupportView: View {
     @State private var email = ""
     @State private var message = ""
     @State private var isSubmitting = false
-    @State private var showSuccess = false
-    @State private var errorMessage: String?
+    @State private var showResultAlert = false
+    @State private var resultSuccess = false
+    @State private var resultMessage = ""
 
-    private let feedbackURL = "https://feedback-board.iocompile67692.workers.dev/api/feedback"
+    private let backendURL = "https://feedback-board.iocompile67692.workers.dev/api/feedback"
+    private let appName = "VoicePen"
+
+    private var isFormValid: Bool {
+        !name.isEmpty &&
+        !email.isEmpty &&
+        email.contains("@") &&
+        !message.isEmpty &&
+        (selectedSubject != .other || !customSubject.isEmpty)
+    }
+
+    private var emailSubject: String {
+        selectedSubject == .other ? customSubject : selectedSubject.displayName
+    }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 24) {
                 subjectSection
                 if selectedSubject == .other {
                     customSubjectField
@@ -23,25 +51,25 @@ struct ContactSupportView: View {
                 emailField
                 messageField
                 submitButton
+                privacyNote
             }
             .padding()
         }
         .navigationTitle("Contact Support")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Thank You!", isPresented: $showSuccess) {
-            Button("OK") { }
+        .alert("Support", isPresented: $showResultAlert) {
+            Button("OK") {
+                if resultSuccess {
+                    resetForm()
+                }
+            }
         } message: {
-            Text("Your feedback has been submitted. We'll get back to you soon.")
-        }
-        .alert("Error", isPresented: .constant(errorMessage != nil)) {
-            Button("OK") { errorMessage = nil }
-        } message: {
-            Text(errorMessage ?? "")
+            Text(resultMessage)
         }
     }
 
     private var subjectSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Subject")
                 .font(.headline)
 
@@ -81,6 +109,7 @@ struct ContactSupportView: View {
                 .font(.headline)
             TextField("Your name", text: $name)
                 .textFieldStyle(.roundedBorder)
+                .textContentType(.name)
         }
     }
 
@@ -92,7 +121,6 @@ struct ContactSupportView: View {
                 .textFieldStyle(.roundedBorder)
                 .keyboardType(.emailAddress)
                 .textContentType(.emailAddress)
-                .autocorrectionDisabled()
                 .autocapitalization(.none)
         }
     }
@@ -112,71 +140,104 @@ struct ContactSupportView: View {
 
     private var submitButton: some View {
         Button(action: submitFeedback) {
-            if isSubmitting {
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .tint(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-            } else {
-                Text("Submit")
+            HStack {
+                if isSubmitting {
+                    ProgressView()
+                        .tint(.white)
+                }
+                Text(isSubmitting ? "Sending..." : "Submit")
                     .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
             }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(isFormValid ? Color.accentColor : Color.gray)
+            .foregroundStyle(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .background(Color.accentColor)
-        .foregroundStyle(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .disabled(isSubmitting || name.isEmpty || email.isEmpty || message.isEmpty)
-        .opacity(name.isEmpty || email.isEmpty || message.isEmpty ? 0.5 : 1.0)
+        .disabled(!isFormValid || isSubmitting)
+    }
+
+    private var privacyNote: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "lock.shield.fill")
+                .foregroundStyle(.green)
+            Text("Your feedback helps us improve VoicePen. We only collect the information you provide above.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(Color.green.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private func submitFeedback() {
+        guard isFormValid else { return }
         isSubmitting = true
-        errorMessage = nil
 
-        let subjectText = selectedSubject == .other ? customSubject : selectedSubject.displayName
+        let request = FeedbackRequest(
+            name: name,
+            email: email,
+            subject: emailSubject,
+            message: message,
+            app_name: appName
+        )
 
-        let body: [String: String] = [
-            "name": name,
-            "email": email,
-            "subject": subjectText,
-            "message": message,
-            "app_name": "VoicePen"
-        ]
-
-        guard let url = URL(string: feedbackURL),
-              let httpBody = try? JSONEncoder().encode(body) else {
-            isSubmitting = false
-            errorMessage = "Failed to prepare request."
+        guard let url = URL(string: backendURL) else {
+            showResult(success: false, message: "Invalid backend URL.")
             return
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = httpBody
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        URLSession.shared.dataTask(with: request) { _, response, error in
+        do {
+            urlRequest.httpBody = try JSONEncoder().encode(request)
+        } catch {
+            showResult(success: false, message: "Failed to encode request.")
+            return
+        }
+
+        URLSession.shared.dataTask(with: urlRequest) { data, response, error in
             DispatchQueue.main.async {
                 isSubmitting = false
+
                 if let error = error {
-                    errorMessage = error.localizedDescription
+                    showResult(success: false, message: "Network error: \(error.localizedDescription)")
                     return
                 }
-                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                    showSuccess = true
-                    name = ""
-                    email = ""
-                    message = ""
-                    customSubject = ""
-                    selectedSubject = .general
-                } else {
-                    errorMessage = "Failed to submit feedback. Please try again."
+
+                guard let data = data else {
+                    showResult(success: false, message: "No response from server.")
+                    return
+                }
+
+                do {
+                    let decoded = try JSONDecoder().decode(FeedbackResponse.self, from: data)
+                    if decoded.success {
+                        showResult(success: true, message: "Thank you! Your feedback has been received.")
+                    } else {
+                        showResult(success: false, message: decoded.error ?? "Something went wrong. Please try again.")
+                    }
+                } catch {
+                    showResult(success: false, message: "Failed to parse server response.")
                 }
             }
         }.resume()
+    }
+
+    private func showResult(success: Bool, message: String) {
+        resultSuccess = success
+        resultMessage = message
+        showResultAlert = true
+    }
+
+    private func resetForm() {
+        name = ""
+        email = ""
+        message = ""
+        customSubject = ""
+        selectedSubject = .general
     }
 }
 
@@ -192,11 +253,11 @@ enum SupportSubject: String, CaseIterable {
     var displayName: String {
         switch self {
         case .general: return "General"
-        case .featureSuggestion: return "Feature Suggestion"
+        case .featureSuggestion: return "Feature"
         case .bugReport: return "Bug Report"
-        case .usageQuestion: return "Usage Question"
+        case .usageQuestion: return "Question"
         case .performanceIssue: return "Performance"
-        case .uiImprovement: return "UI Improvement"
+        case .uiImprovement: return "UI"
         case .other: return "Other"
         }
     }

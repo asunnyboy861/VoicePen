@@ -23,7 +23,7 @@ final class TranscriptionDetailViewModel {
 
         audioPlayer = try? AVAudioPlayer(contentsOf: audioURL)
         audioPlayer?.prepareToPlay()
-        totalDuration = recording.duration
+        totalDuration = audioPlayer?.duration ?? recording.duration
     }
 
     func togglePlayback() {
@@ -52,10 +52,19 @@ final class TranscriptionDetailViewModel {
         isPlaying = false
         playbackPosition = 0
         stopPlaybackTimer()
+        deactivateAudioSession()
     }
 
     func copyTranscript(_ recording: Recording) {
         UIPasteboard.general.string = recording.totalText
+    }
+
+    func deactivateAudioSession() {
+        audioPlayer?.stop()
+        isPlaying = false
+        stopPlaybackTimer()
+        let session = AVAudioSession.sharedInstance()
+        try? session.setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     private func startPlaybackTimer() {

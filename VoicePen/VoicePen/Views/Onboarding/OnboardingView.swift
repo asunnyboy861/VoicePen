@@ -1,4 +1,6 @@
 import SwiftUI
+import AVFoundation
+import Speech
 
 struct OnboardingView: View {
     @State private var currentStep = 0
@@ -6,7 +8,9 @@ struct OnboardingView: View {
     @State private var isDownloadingModel = false
     @State private var downloadProgress: Double = 0
     @State private var permissionGranted = false
+    @State private var speechPermissionGranted = false
     @State private var modelDownloaded = false
+    @State private var modelDownloadFailed = false
 
     let onComplete: () -> Void
 
@@ -19,15 +23,9 @@ struct OnboardingView: View {
         ),
         OnboardingStep(
             icon: "mic.fill",
-            title: "Microphone Access",
-            subtitle: "VoicePen needs your microphone to record audio.",
-            description: "Your audio never leaves your device. All processing happens locally."
-        ),
-        OnboardingStep(
-            icon: "brain",
-            title: "Download AI Model",
-            subtitle: "A small AI model is needed for transcription.",
-            description: "This ~300MB model enables on-device speech recognition. Downloaded once, works forever."
+            title: "Permissions & AI Model",
+            subtitle: "VoicePen needs microphone access and an AI model for transcription.",
+            description: "Your audio never leaves your device. The ~300MB model enables on-device speech recognition."
         ),
         OnboardingStep(
             icon: "checkmark.circle",
@@ -74,7 +72,7 @@ struct OnboardingView: View {
                 }
 
                 Button(action: handleNext) {
-                    Text(currentStep == steps.count - 1 ? "Get Started" : "Continue")
+                    Text(currentStep == steps.count - 1 ? "Get Started" : (currentStep == 1 && modelDownloadFailed ? "Skip for Now" : "Continue"))
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -96,24 +94,64 @@ struct OnboardingView: View {
     private var stepSpecificContent: some View {
         switch currentStep {
         case 1:
-            if permissionGranted {
-                Label("Microphone Access Granted", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-            } else if isRequestingPermission {
-                ProgressView()
-            }
-        case 2:
-            if modelDownloaded {
-                Label("Model Downloaded", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-            } else if isDownloadingModel {
-                VStack(spacing: 8) {
-                    ProgressView(value: downloadProgress)
-                    Text("\(Int(downloadProgress * 100))%")
-                        .font(.caption.monospacedDigit())
+            VStack(spacing: 12) {
+                if permissionGranted && speechPermissionGranted {
+                    Label("All Permissions Granted", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                } else if isRequestingPermission {
+                    ProgressView()
+                    Text("Requesting permissions...")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
+                } else {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            Image(systemName: permissionGranted ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                .foregroundStyle(permissionGranted ? .green : .red)
+                            Text("Microphone")
+                                .font(.caption)
+                        }
+                        HStack(spacing: 4) {
+                            Image(systemName: speechPermissionGranted ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                .foregroundStyle(speechPermissionGranted ? .green : .red)
+                            Text("Speech Recognition")
+                                .font(.caption)
+                        }
+                        if !permissionGranted || !speechPermissionGranted {
+                            Text("Some permissions were denied. You can enable them later in Settings > Privacy.")
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                    }
                 }
-                .padding(.horizontal)
+
+                Divider()
+
+                if modelDownloaded {
+                    Label("Model Downloaded", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                } else if modelDownloadFailed {
+                    VStack(spacing: 8) {
+                        Label("Download Failed", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("You can download the model later in Settings. Transcription will require the model to be downloaded first.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                } else if isDownloadingModel {
+                    VStack(spacing: 8) {
+                        ProgressView()
+                        Text("Downloading AI model... This may take a few minutes.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.horizontal)
+                }
             }
         default:
             EmptyView()
@@ -122,11 +160,18 @@ struct OnboardingView: View {
 
     private func handleNext() {
         switch currentStep {
+        case 0:
+            withAnimation { currentStep += 1 }
+            requestPermissions()
         case 1:
-            requestMicrophonePermission()
+            if modelDownloaded {
+                withAnimation { currentStep += 1 }
+            } else if modelDownloadFailed {
+                withAnimation { currentStep += 1 }
+            } else {
+                downloadModel()
+            }
         case 2:
-            downloadModel()
-        case 3:
             UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
             onComplete()
         default:
@@ -134,21 +179,43 @@ struct OnboardingView: View {
         }
     }
 
-    private func requestMicrophonePermission() {
+    private func requestPermissions() {
         isRequestingPermission = true
-        AVAudioSession.sharedInstance().requestRecordPermission { granted in
-            DispatchQueue.main.async {
-                self.isRequestingPermission = false
-                self.permissionGranted = granted
-                if granted {
-                    withAnimation { self.currentStep += 1 }
+        let group = DispatchGroup()
+
+        group.enter()
+        if #available(iOS 17.0, *) {
+            AVAudioApplication.requestRecordPermission { granted in
+                DispatchQueue.main.async {
+                    self.permissionGranted = granted
                 }
+                group.leave()
             }
+        } else {
+            AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                DispatchQueue.main.async {
+                    self.permissionGranted = granted
+                }
+                group.leave()
+            }
+        }
+
+        group.enter()
+        SFSpeechRecognizer.requestAuthorization { status in
+            DispatchQueue.main.async {
+                self.speechPermissionGranted = (status == .authorized)
+            }
+            group.leave()
+        }
+
+        group.notify(queue: .main) {
+            self.isRequestingPermission = false
         }
     }
 
     private func downloadModel() {
         isDownloadingModel = true
+        modelDownloadFailed = false
         Task {
             do {
                 let engine = TranscriptionEngine.shared
@@ -161,14 +228,12 @@ struct OnboardingView: View {
             } catch {
                 await MainActor.run {
                     self.isDownloadingModel = false
-                    withAnimation { self.currentStep += 1 }
+                    self.modelDownloadFailed = true
                 }
             }
         }
     }
 }
-
-import AVFoundation
 
 struct OnboardingStep {
     let icon: String

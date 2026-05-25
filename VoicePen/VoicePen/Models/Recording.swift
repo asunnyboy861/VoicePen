@@ -3,17 +3,17 @@ import SwiftData
 
 @Model
 final class Recording {
-    @Attribute(.unique) var id: UUID
-    var title: String
-    var createdAt: Date
-    var duration: TimeInterval
-    var audioFileName: String
-    var language: String
-    var modelUsed: String
-    var isPinned: Bool
+    var id: UUID = UUID()
+    var title: String = ""
+    var createdAt: Date = Date()
+    var duration: TimeInterval = 0
+    var audioFileName: String = ""
+    var language: String = "en"
+    var modelUsed: String = "openai_whisper-large-v3-turbo"
+    var isPinned: Bool = false
 
     @Relationship(deleteRule: .cascade, inverse: \TranscriptSegment.recording)
-    var segments: [TranscriptSegment]
+    var segments: [TranscriptSegment]? = []
 
     var displayTitle: String {
         if title.isEmpty {
@@ -23,11 +23,11 @@ final class Recording {
     }
 
     var previewText: String {
-        segments.sorted(by: { $0.startTime < $1.startTime }).first?.text ?? ""
+        (segments ?? []).sorted(by: { $0.startTime < $1.startTime }).first?.text ?? ""
     }
 
     var totalText: String {
-        segments.sorted(by: { $0.startTime < $1.startTime }).map(\.text).joined(separator: " ")
+        (segments ?? []).sorted(by: { $0.startTime < $1.startTime }).map(\.text).joined(separator: " ")
     }
 
     init(
@@ -39,7 +39,7 @@ final class Recording {
         language: String = "en",
         modelUsed: String = "openai_whisper-large-v3-turbo",
         isPinned: Bool = false,
-        segments: [TranscriptSegment] = []
+        segments: [TranscriptSegment]? = []
     ) {
         self.id = id
         self.title = title

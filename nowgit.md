@@ -18,6 +18,7 @@
 | Landing Page | https://asunnyboy861.github.io/VoicePen/ | ✅ Active |
 | Support | https://asunnyboy861.github.io/VoicePen/support.html | ✅ Active |
 | Privacy Policy | https://asunnyboy861.github.io/VoicePen/privacy.html | ✅ Active |
+| Terms of Use | https://asunnyboy861.github.io/VoicePen/terms.html | ✅ Active |
 
 ## Repository Structure
 

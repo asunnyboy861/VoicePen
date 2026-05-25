@@ -3,11 +3,11 @@ import SwiftData
 
 @Model
 final class TranscriptSegment {
-    @Attribute(.unique) var id: UUID
-    var text: String
-    var startTime: TimeInterval
-    var endTime: TimeInterval
-    var confidence: Double
+    var id: UUID = UUID()
+    var text: String = ""
+    var startTime: TimeInterval = 0
+    var endTime: TimeInterval = 0
+    var confidence: Double = 1.0
 
     var recording: Recording?
 

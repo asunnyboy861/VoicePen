@@ -9,7 +9,7 @@ struct TranscriptionDetailView: View {
     @State private var titleText = ""
 
     var sortedSegments: [TranscriptSegment] {
-        recording.segments.sorted { $0.startTime < $1.startTime }
+        (recording.segments ?? []).sorted { $0.startTime < $1.startTime }
     }
 
     var body: some View {
@@ -61,6 +61,9 @@ struct TranscriptionDetailView: View {
             viewModel.setupPlayback(for: recording)
             titleText = recording.title
         }
+        .onDisappear {
+            viewModel.deactivateAudioSession()
+        }
     }
 
     private var headerSection: some View {
@@ -74,6 +77,30 @@ struct TranscriptionDetailView: View {
                 PrivacyBadge()
             }
             .font(.subheadline)
+
+            if titleEditing {
+                TextField("Recording title", text: $titleText)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.headline)
+                    .onSubmit {
+                        recording.title = titleText
+                        try? modelContext.save()
+                        titleEditing = false
+                    }
+            } else {
+                Button(action: {
+                    titleText = recording.title
+                    titleEditing = true
+                }) {
+                    HStack(spacing: 4) {
+                        Text(recording.displayTitle)
+                            .font(.headline)
+                        Image(systemName: "pencil")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
 
             HStack {
                 Label(formatDuration(recording.duration), systemImage: "timer")
@@ -158,6 +185,10 @@ struct ExportSheetView: View {
     let format: ExportFormat
     @Environment(\.dismiss) private var dismiss
 
+    private var exportData: Data {
+        ExportService.export(recording: recording, format: format) ?? Data()
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
@@ -197,9 +228,5 @@ struct ExportSheetView: View {
                 }
             }
         }
-    }
-
-    private var exportData: Data {
-        ExportService.export(recording: recording, format: format) ?? Data()
     }
 }

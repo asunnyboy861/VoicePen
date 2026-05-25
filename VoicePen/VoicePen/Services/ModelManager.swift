@@ -15,18 +15,35 @@ final class ModelManager {
         return dir
     }()
 
+    private let whisperKitModelsDirectory: URL = {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return appSupport.appendingPathComponent("com.argmaxinc.whisperkit", isDirectory: true)
+    }()
+
     init() {
         scanDownloadedModels()
     }
 
     func scanDownloadedModels() {
         downloadedModels = []
+
+        let wkContents = try? FileManager.default.contentsOfDirectory(
+            at: whisperKitModelsDirectory,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: .skipsHiddenFiles
+        )
+        for url in wkContents ?? [] {
+            if url.hasDirectoryPath {
+                downloadedModels.append(url.lastPathComponent)
+            }
+        }
+
         let contents = try? FileManager.default.contentsOfDirectory(
             at: modelsDirectory,
             includingPropertiesForKeys: nil
         )
         for url in contents ?? [] {
-            if url.hasDirectoryPath {
+            if url.hasDirectoryPath && !downloadedModels.contains(url.lastPathComponent) {
                 downloadedModels.append(url.lastPathComponent)
             }
         }
@@ -42,12 +59,18 @@ final class ModelManager {
     }
 
     func totalStorageUsed() -> Int64 {
-        return directorySize(at: modelsDirectory)
+        return directorySize(at: modelsDirectory) + directorySize(at: whisperKitModelsDirectory)
     }
 
     func deleteModel(_ model: String) throws {
         let modelDir = modelsDirectory.appendingPathComponent(model)
-        try FileManager.default.removeItem(at: modelDir)
+        if FileManager.default.fileExists(atPath: modelDir.path) {
+            try FileManager.default.removeItem(at: modelDir)
+        }
+        let wkModelDir = whisperKitModelsDirectory.appendingPathComponent(model)
+        if FileManager.default.fileExists(atPath: wkModelDir.path) {
+            try FileManager.default.removeItem(at: wkModelDir)
+        }
         downloadedModels.removeAll { $0 == model }
     }
 

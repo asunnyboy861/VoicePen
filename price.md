@@ -1,56 +1,78 @@
 # Pricing Configuration
 
-## Monetization Model: Paid Download
+## Monetization Model: Subscription (IAP)
 
-- **Price**: $4.99 (One-time purchase)
-- **IAP**: Not required
-- **Subscription**: None
-- **Ads**: None
-- **Account Required**: No
+## Subscription Group
+- **Group Name**: VoicePen Pro
+- **Group ID**: com.zzoutuo.VoicePen.pro
 
-## App Store Connect Pricing
-- **Price Tier**: Tier 3 ($4.99 USD)
-- **App Store Title**: VoicePen - Offline Voice to Text
-- **Subtitle**: Speak Freely, Write Privately
+## Subscription Tiers
+
+### 1. Monthly Subscription
+- **Reference Name**: Pro Monthly
+- **Product ID**: `com.zzoutuo.VoicePen.pro.monthly`
+- **Price**: $1.99 per month
+- **Display Name**: VoicePen Pro Monthly
+- **Description**: Unlimited recordings & all features
+- **Localization**: English (US)
+
+### 2. Yearly Subscription
+- **Reference Name**: Pro Yearly
+- **Product ID**: `com.zzoutuo.VoicePen.pro.yearly`
+- **Price**: $9.99 per year (58% savings vs monthly)
+- **Display Name**: VoicePen Pro Yearly
+- **Description**: Unlimited recordings & all features
+- **Localization**: English (US)
+
+### 3. Lifetime Purchase
+- **Reference Name**: Lifetime Access
+- **Product ID**: `com.zzoutuo.VoicePen.pro.lifetime`
+- **Price**: $19.99 one-time
+- **Display Name**: VoicePen Pro Lifetime
+- **Description**: Pay once, own forever
+- **Note**: No ongoing server costs — all processing is on-device
+
+## Free Tier
+- **Recordings per month**: 5
+- **All other features**: Fully available (on-device transcription, export, iCloud sync, title editing, audio playback)
+- **Limitation**: Recording count only
+
+## Free Trial
+- **Duration**: Not offered (free tier serves as trial)
+
+## Policy Pages Required
+- Support Page: ✅ (Must include subscription management info)
+- Privacy Policy: ✅
+- Terms of Use: ✅ (REQUIRED for subscription apps)
+
+## Apple IAP Compliance Checklist
+- [ ] Auto-renewal terms included in Terms
+- [ ] Cancellation instructions included in Terms
+- [ ] Pricing clearly stated in Paywall
+- [ ] Restore purchases functionality implemented
+- [ ] Subscription management link in Settings
+
+## IAP Implementation Plan
+
+### PurchaseManager.swift (StoreKit 2)
+- Product IDs: `com.zzoutuo.VoicePen.pro.monthly`, `com.zzoutuo.VoicePen.pro.yearly`, `com.zzoutuo.VoicePen.pro.lifetime`
+- Features: fetch products, purchase, restore, status tracking, transaction listener
+- UsageTracker: free limit enforcement (5/month)
+
+### Paywall UI Requirements
+- All 3 products displayed with pricing
+- Auto-renewal disclosure text
+- Privacy Policy + Terms of Use links below Subscribe button
+- Restore Purchases button
+- No dark patterns
 
 ## Competitive Price Positioning
 
 | Competitor | Price | Model | VoicePen Advantage |
-|------------|-------|-------|--------------------|
-| Otter.ai | $8.33/mo ($100/yr) | Subscription | 20x cheaper over 1 year |
-| Notta | $8.17/mo ($98/yr) | Subscription | 20x cheaper over 1 year |
-| VoiceScriber | $49.99 lifetime or $5.99/wk | Mixed | 10x cheaper one-time |
-| Whisper Notes | $6.99 once | Paid | 29% cheaper |
-| Aiko | ~$9.99 once | Paid | 50% cheaper |
-| Apple Dictation | Free | Built-in | More features, keyboard ext, widget |
-
-## Why Paid Download (Not Subscription)
-
-1. **Zero server cost**: All processing on-device, no cloud infrastructure to maintain
-2. **User pain point**: "Subscription fatigue" is the #1 complaint in voice-to-text category
-3. **Competitive advantage**: $4.99 vs Otter $100/year = 20x price gap
-4. **Trust signal**: One-time purchase = confidence in product quality
-5. **Viral potential**: "Only $5, yours forever" drives word-of-mouth
-
-## Why Not Free + Pro
-
-1. **Core feature indivisible**: Offline transcription cannot be meaningfully limited without breaking the "爽感" (delight)
-2. **User experience**: Free tier restrictions would undermine the instant-satisfaction design philosophy
-3. **Pricing psychology**: $4.99 < price of a coffee → zero decision friction
-4. **Development cost**: Single-function app, low maintenance cost
-
-## Policy Pages Required
-- Support Page: ✅
-- Privacy Policy: ✅
-- Terms of Use: ❌ (Not needed for paid download apps)
-
-## Revenue Projections
-
-| Scenario | Monthly Downloads | Conversion | Monthly Revenue | Annual Revenue |
-|----------|-------------------|------------|-----------------|----------------|
-| Conservative | 500 | 15% | $375 | $4,500 |
-| Moderate | 2,000 | 20% | $2,000 | $24,000 |
-| Optimistic | 5,000 | 25% | $6,250 | $75,000 |
-| Breakout | 20,000 | 30% | $30,000 | $360,000 |
-
-Note: Apple takes 30% commission ($4.99 × 0.7 = $3.49 net revenue per sale)
+|------------|-------|-------|-------------------|
+| Otter.ai | $8.33/mo ($100/yr) | Subscription | 5-10x cheaper |
+| Notta | $8.17/mo ($98/yr) | Subscription | 5-10x cheaper |
+| VoiceScriber | $49.99 lifetime or $5.99/wk | Mixed | 2-3x cheaper |
+| Whisper Notes | $6.99 once | Paid | Free to try first |
+| Aiko | ~$9.99 once | Paid | Free to try first |
+| Apple Dictation | Free | Built-in | More features, offline AI |
